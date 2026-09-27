@@ -1,6 +1,6 @@
 # Verification — 2026-09-27
 
-This verification records the repository-audit remediation, the complete 15-item UI feedback pass, and the Windows `1.0.1` release artifact checks. The evidence below records commands run against the working tree after the changes. The installer was built and later published with the release; installer installation/uninstallation and native interactive runtime smoke remain unverified.
+This verification records the repository-audit remediation, the complete 15-item UI feedback pass, and the Windows `1.0.1` release artifact checks. The evidence below records commands run against the working tree after the changes. The installer was built and published with the release; silent installation and a no-document cold start were verified afterward, while uninstallation and full native interaction remain unverified.
 
 ## 1.0.1 UI and Windows release validation
 
@@ -15,6 +15,8 @@ This verification records the repository-audit remediation, the complete 15-item
 - Installer SHA-256: `5BB91ED55FB3B99B300F84AA021891138F548CEF0D6BEBA6BD2F6F5F452F16F3`.
 - Release executable: `src-tauri/target/release/markdown-preview-plus.exe` (13,320,704 bytes), SHA-256 `66B233A8E5044BBBDF83F70508B17DF59627E2249A9033E5E72DC54F0DC742D5`.
 - Browser smoke on a clean Vite preview passed for the initial empty state: the compact toolbar showed Open while Find/PDF remained disabled, the empty-state guidance was visible, and no new console errors were recorded after fixing the search-divider markup. Loading `fixtures/reader-demo.md` through the browser automation file chooser was not available, so fixture rendering was not claimed as a browser smoke result.
+- Silent NSIS installation with `/S` — passed with exit code 0. The installed executable at `%LOCALAPPDATA%\\Markdown Preview Plus\\markdown-preview-plus.exe` reported product/file version `1.0.1`.
+- Installed executable cold start — passed: the process remained running, reported window title `Markdown Preview Plus`, and was responsive. A command-line launch with `fixtures/reader-demo.md` was attempted separately, but the title did not change, so native startup document delivery is not claimed as passed.
 - `git diff --check` — passed; only CRLF normalization warnings were reported by Git.
 
 ## Passed in this pass
@@ -44,7 +46,8 @@ This verification records the repository-audit remediation, the complete 15-item
 
 ## Not run in this pass
 
-- Native runtime smoke for the installed desktop executable, toolbar picker, startup/file-association launch, second-instance delivery, and drag/drop was not rerun after the security boundary change.
+- Native toolbar picker, file-association launch, second-instance document delivery, drag/drop, and document rendering through the installed app remain unverified. A direct command-line fixture launch was attempted but did not visibly load the fixture.
+- Installer uninstallation was not run.
 - `npm run tauri:build`, installer installation/uninstallation, Explorer Open With behavior, Linux/macOS builds, and Linux/macOS runtime checks were not run.
 - Actual OS print-dialog interaction and user-selected PDF destination were not run. Browser print output and the frontend print invocation remain prior evidence.
 - Cold-start timing, full process-tree memory, diagram peak memory, code signing, and notarization were not measured.
