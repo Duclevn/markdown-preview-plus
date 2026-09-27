@@ -1,22 +1,57 @@
 # Verification — 2026-09-27
 
-Implementation was delegated to GPT-6 Luna with Max reasoning. A separate read-only reviewer checked the native integration and the document-read race fix. Final narrow review found no remaining actionable defect.
+This verification records the repository-audit remediation, the complete 15-item UI feedback pass, and the Windows `1.0.1` release artifact checks. The evidence below records commands run against the working tree after the changes. The installer was built and later published with the release; installer installation/uninstallation and native interactive runtime smoke remain unverified.
 
-## Passed
+## 1.0.1 UI and Windows release validation
 
-- Clean `npm ci`, TypeScript `npm run check`, `npm test` (11 tests), and production `npm run build`.
-- `npm audit --omit=dev`: zero reported vulnerabilities. Installed Mermaid/Chevrotain `lodash-es` copies resolve to the pinned override 4.18.1.
-- Phase 2 rich-content tests cover metadata extraction (including empty and non-leading blocks), inline/display math, local KaTeX error output, all four admonitions plus unknown fallback, a fenced-code marker inside an admonition, curated JavaScript highlighting, unknown-language escaping, and Mermaid placeholder preservation. The current run is `npm run check` passed, `npm test` passed (11 tests), and `npm run build` passed.
-- The frontend build ships 20 KaTeX `.woff2` font payloads (19 emitted files and one small Vite-inlined font) and no KaTeX `.woff` or `.ttf` assets. The stylesheet is bundled locally; no CDN or font URL is introduced.
-- Windows `cargo check`, using isolated Rust 1.98.1, existing Visual Studio 2022 Build Tools, and a local Microsoft Windows SDK. Three unused-mut warnings remain; no compile errors.
-- Phase 2 `npm run tauri:build -- --bundles nsis --ci`, launched through the repository's isolated Windows toolchain script, built the release executable and NSIS installer successfully with Tauri Rust/API/CLI 2.12.0. The existing three `unused_mut` Rust warnings remain; there were no build errors.
-- Browser smoke with real DOMPurify rendered two KaTeX expressions plus one visible math error, five admonition containers, 32 highlight spans, four diagram SVGs plus one contained diagram error, and no leaked front matter or console warnings/errors. The narrowed policy preserved MathML while disabling SVG filter primitives and arbitrary data/ARIA attributes in the Markdown sanitizer.
-- Headless Edge browser acceptance: Unicode, Markdown table, Mermaid flow/sequence, PlantUML sequence/class, isolated malformed-diagram error, script/unsafe-link containment, no external rendering requests, search count/navigation, replacement file, unsupported-file retention, print invocation and article-only print layout.
-- Dark appearance at 640px: readable diagram labels and no document-level horizontal overflow, visually inspected.
-- PDF generated from the rendered article in Chromium: two pages with diagrams and Unicode. Both rasterized pages were visually inspected using Poppler.
-- Actual release executable, controlled through WebView2 with a temporary debugging environment variable: startup Markdown argument, four rendered SVG diagrams, local raster image, search, and second-process file delivery into the existing window all passed. Test process was closed afterward. Debugging is not enabled in the shipped app configuration.
+- All 15 items in `markdown-preview-plus-ui-review-v2.md` were implemented, including compact neutral toolbar/search, explicit search states, resizable/collapsible TOC hierarchy, quieter scrolling, adaptive prose-versus-technical widths, tighter typography, and semantic color usage.
+- `npm run check` — passed.
+- `npm test` — passed: 3 test files and 19 tests.
+- `npm run build` — passed; Vite emitted only the existing large-chunk warnings.
+- `npm audit --omit=dev` — passed with 0 reported vulnerabilities.
+- `.tools\\cargo\\bin\\cargo.exe +stable-x86_64-pc-windows-msvc fmt --manifest-path src-tauri\\Cargo.toml -- --check` — passed.
+- `.tools\\check-native.cmd` — passed; native library tests passed with 7 tests.
+- Windows NSIS build — passed and produced `src-tauri/target/release/bundle/nsis/Markdown Preview Plus_1.0.1_x64-setup.exe` (5,874,374 bytes / 5.60 MiB).
+- Installer SHA-256: `5BB91ED55FB3B99B300F84AA021891138F548CEF0D6BEBA6BD2F6F5F452F16F3`.
+- Release executable: `src-tauri/target/release/markdown-preview-plus.exe` (13,320,704 bytes), SHA-256 `66B233A8E5044BBBDF83F70508B17DF59627E2249A9033E5E72DC54F0DC742D5`.
+- Browser smoke on a clean Vite preview passed for the initial empty state: the compact toolbar showed Open while Find/PDF remained disabled, the empty-state guidance was visible, and no new console errors were recorded after fixing the search-divider markup. Loading `fixtures/reader-demo.md` through the browser automation file chooser was not available, so fixture rendering was not claimed as a browser smoke result.
+- `git diff --check` — passed; only CRLF normalization warnings were reported by Git.
 
-## Windows artifacts
+## Passed in this pass
+
+- `npm run check` — passed (`tsc --noEmit`).
+- `npm test` — passed: 3 test files and 19 tests. This includes the real DOMPurify path under `jsdom@26.1.0`, locale-sensitive Unicode search-offset regressions, and the existing read/search/content coverage.
+- `npm run build` — passed with Vite 8.3.1. The existing large-chunk warnings for bundled diagram runtimes remain; no production dependency was added for the sanitizer tests.
+- `npm audit --omit=dev` — passed with 0 reported vulnerabilities.
+- `npm ls lodash-es --all` — passed. Mermaid's transitive copies resolve to the root override `lodash-es@4.18.1`; `lodash-es` is not a direct dependency.
+- `.tools\cargo\bin\cargo.exe +stable-x86_64-pc-windows-msvc fmt --manifest-path src-tauri\Cargo.toml -- --check` — passed.
+- `.tools\check-native.cmd` — passed for the Windows native `cargo check` path using the repository's isolated toolchain. The script still prints an environment setup message from the local Visual Studio probe, but exited successfully and produced no Rust warnings.
+- Native library tests through the isolated Windows toolchain — passed: 7 tests. The tests cover Markdown extension/startup filtering, relative-image policy, authorization, stale document grants, traversal/symlink boundaries where supported, image signatures, and document/image size limits.
+- `.github/workflows/desktop-build.yml` now runs `cargo test --manifest-path src-tauri/Cargo.toml --lib` in every existing Windows, Linux, and macOS matrix job before the native bundle build. Remote CI execution was not run in this workspace.
+
+## Environment note
+
+- `npm ci --ignore-scripts` — failed before completion because Windows returned `EPERM` while unlinking Vite's native Rolldown binary. `npm install --ignore-scripts` restored the same lockfile dependency graph successfully and reported 0 vulnerabilities; all frontend checks above were rerun afterward.
+
+## Changes covered by the checks
+
+- Native document reads now consume a Rust-owned pending path atomically or open a file through the native asynchronous dialog. Each successful response carries only its name, content, and opaque document grant; the frontend has no arbitrary path argument and receives no native document path. Startup, file-association, second-instance, macOS open, and desktop-drop flows remain represented by the Rust queue. Duplicate notifications with no pending document are harmless.
+- Local image reads require the current document grant and remain relative to the native authorized document. The grant lock atomically rejects stale A requests after B is authorized, while retaining canonicalization, traversal, symlink, size, MIME, and signature checks.
+- Local image decoding is bounded to four concurrent workers. Search input is coalesced with a short debounce, keyboard navigation flushes pending input immediately, and print preparation flushes pending search work before clearing/restoring highlights.
+- Search preserves locale-sensitive matching while mapping lowercase expansions back to their original grapheme ranges, including Turkish casing, Lithuanian combining-mark context, dotted-I, and Greek final sigma.
+- Real DOMPurify regression tests run through the `jsdom` environment and cover dangerous HTML, SVG, URL, event-handler, and data-attribute input, plus surviving KaTeX math and local image/diagram attributes through the full Markdown rendering path.
+- The three unnecessary Rust `mut` qualifiers and the unused `#app` selector were removed. The direct `lodash-es` dependency was removed while its `4.18.1` transitive override remains in the lockfile.
+
+## Not run in this pass
+
+- Native runtime smoke for the installed desktop executable, toolbar picker, startup/file-association launch, second-instance delivery, and drag/drop was not rerun after the security boundary change.
+- `npm run tauri:build`, installer installation/uninstallation, Explorer Open With behavior, Linux/macOS builds, and Linux/macOS runtime checks were not run.
+- Actual OS print-dialog interaction and user-selected PDF destination were not run. Browser print output and the frontend print invocation remain prior evidence.
+- Cold-start timing, full process-tree memory, diagram peak memory, code signing, and notarization were not measured.
+
+## Prior Phase 2 artifact measurements
+
+These measurements were recorded before the audit remediation and are retained as historical context; they are not a claim about the `1.0.1` installer above.
 
 | Artifact | Phase 1 baseline | Phase 2 | Delta |
 |---|---:|---:|---:|
@@ -24,17 +59,4 @@ Implementation was delegated to GPT-6 Luna with Max reasoning. A separate read-o
 | `src-tauri/target/release/markdown-preview-plus.exe` | 12,853,760 bytes | 13,235,712 bytes | +381,952 bytes (+2.97%) |
 | `src-tauri/target/release/bundle/nsis/Markdown Preview Plus_1.0.0_x64-setup.exe` | 5,475,175 bytes | 5,861,034 bytes | +385,859 bytes (+7.05%) |
 
-The executable uses the system WebView2 runtime. Installer size does not represent total system runtime usage. Development-only toolchains in ignored `.tools/` are not included in the app.
-
-The Phase 2 installer is the compressed delivery measurement; the executable and frontend totals are uncompressed. The app still uses the system WebView2 runtime, which is not included in these artifact sizes.
-
-## Not yet verified
-
-- Linux `.deb` and macOS `.app`/`.dmg` builds and runtime behavior. The GitHub Actions matrix is provided but has not been run remotely.
-- Installation/uninstallation and Explorer Open With behavior. The installer was built; it was not installed. Launch arguments and single-instance delivery were exercised directly.
-- Actual OS print-dialog interaction and a user-selected PDF save destination. Browser PDF output and application print invocation were verified separately.
-- Linux/macOS rich-content runtime behavior remains unverified.
-- Cold-start timing, full process-tree RAM consumption, and diagram memory peaks. Performance numbers in PLAN.md are targets, not measured results.
-- Code signing/notarization; local Windows artifacts are unsigned.
-
-No Git commit, push, or public release was performed.
+The historical executable uses the system WebView2 runtime. Development-only toolchains in ignored `.tools/` are not included in the app. Linux/macOS artifacts and cross-platform runtime behavior remain unverified.

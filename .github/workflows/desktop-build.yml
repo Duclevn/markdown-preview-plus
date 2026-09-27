@@ -67,6 +67,9 @@ jobs:
 
       - run: npm test
 
+      - name: Run native policy tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
       - name: Build native bundle
         run: npx tauri build --bundles ${{ matrix.bundles }}
 

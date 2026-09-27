@@ -1,8 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import './katex/katex.css';
 import './styles.css';
@@ -12,9 +10,9 @@ import { createLatestSerialQueue } from './read-queue';
 import { clearArticleSearch, moveSearchMatch, searchArticle } from './search';
 
 interface MarkdownDocument {
-  path: string;
   name: string;
   content: string;
+  documentGrantId?: string;
 }
 
 interface Readiness {
@@ -35,10 +33,12 @@ const exportButton = element<HTMLButtonElement>('export-button');
 const searchPanel = element<HTMLElement>('search-panel');
 const searchInput = element<HTMLInputElement>('search-input');
 const searchCount = element<HTMLOutputElement>('search-count');
+const searchDivider = element<HTMLSpanElement>('search-divider');
 const searchPrevious = element<HTMLButtonElement>('search-previous');
 const searchNext = element<HTMLButtonElement>('search-next');
 const searchClose = element<HTMLButtonElement>('search-close');
 const tocSidebar = element<HTMLElement>('toc-sidebar');
+const tocToggle = element<HTMLButtonElement>('toc-toggle');
 const tocResizer = element<HTMLDivElement>('toc-resizer');
 const tocList = element<HTMLOListElement>('toc-list');
 const emptyState = element<HTMLElement>('empty-state');
@@ -56,23 +56,28 @@ const shortcutHint = element<HTMLElement>('shortcut-hint');
 const isMac = /Macintosh|Mac OS X/.test(navigator.userAgent);
 const hasNativeBridge = Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 shortcutHint.textContent = `${isMac ? '⌘' : 'Ctrl+'}O`;
+openButton.title = `Open Markdown file (${isMac ? '⌘' : 'Ctrl+'}O)`;
+searchButton.title = `Find in file (${isMac ? '⌘' : 'Ctrl+'}F)`;
+exportButton.title = `Export to PDF (${isMac ? '⌘' : 'Ctrl+'}P)`;
 
 let currentDocument: MarkdownDocument | undefined;
 let currentGeneration = 0;
 let openRequest = 0;
 let searchMatches: HTMLElement[] = [];
 let currentMatch = -1;
+let searchTimer = 0;
 let currentReadiness: Promise<Readiness> = Promise.resolve({ imageFailures: 0 });
 let statusTimer = 0;
 let tocObserver: IntersectionObserver | undefined;
 let tocObserverGeneration = 0;
 let tocHeadings = new Map<string, HTMLHeadingElement>();
-const TOC_MIN_WIDTH = 190;
+const TOC_MIN_WIDTH = 220;
 const TOC_MOBILE_MIN_WIDTH = 150;
 const TOC_MAX_WIDTH = 420;
 const TOC_RESIZE_STEP = 16;
-let tocWidth = 220;
+let tocWidth = 272;
 let tocResizePointerId: number | undefined;
+let tocCollapsed = false;
 const serializeDocumentReads = createLatestSerialQueue();
 
 function setStatus(message: string): void {
@@ -88,22 +93,42 @@ function setAlert(message: string): void {
 }
 
 function updateSearchCount(): void {
-  searchCount.textContent = searchMatches.length === 0
-    ? '0 of 0'
-    : `${currentMatch < 0 ? 0 : currentMatch + 1} of ${searchMatches.length}`;
-  searchPrevious.disabled = searchMatches.length === 0;
-  searchNext.disabled = searchMatches.length === 0;
+  const hasQuery = searchInput.value.trim().length > 0;
+  const hasMatches = searchMatches.length > 0;
+  searchCount.hidden = !hasQuery;
+  searchCount.textContent = hasMatches
+    ? `${currentMatch < 0 ? 0 : currentMatch + 1} of ${searchMatches.length}`
+    : hasQuery ? 'No results' : '';
+  searchDivider.hidden = !hasMatches;
+  searchPrevious.hidden = !hasMatches;
+  searchNext.hidden = !hasMatches;
+  searchPrevious.disabled = !hasMatches;
+  searchNext.disabled = !hasMatches;
 }
 
 function runSearch(): void {
+  searchTimer = 0;
   searchMatches = searchArticle(article, searchInput.value);
   currentMatch = searchMatches.length > 0 ? moveSearchMatch(searchMatches, -1, 1) : -1;
   updateSearchCount();
 }
 
+function scheduleSearch(): void {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(runSearch, 90);
+}
+
+function flushSearch(): void {
+  if (!searchTimer) return;
+  window.clearTimeout(searchTimer);
+  searchTimer = 0;
+  runSearch();
+}
+
 function closeSearch(restoreFocus: boolean): void {
+  window.clearTimeout(searchTimer);
+  searchTimer = 0;
   searchPanel.hidden = true;
-  appShell.classList.remove('search-open');
   searchInput.value = '';
   clearArticleSearch(article);
   searchMatches = [];
@@ -113,6 +138,7 @@ function closeSearch(restoreFocus: boolean): void {
 }
 
 function moveMatch(direction: 1 | -1): void {
+  flushSearch();
   currentMatch = moveSearchMatch(searchMatches, currentMatch, direction);
   updateSearchCount();
 }
@@ -131,6 +157,14 @@ function setActiveTocLink(id: string): void {
     if (isActive) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
   });
+}
+
+function setTocCollapsed(collapsed: boolean): void {
+  tocCollapsed = collapsed;
+  readerLayout.classList.toggle('toc-collapsed', collapsed);
+  tocToggle.setAttribute('aria-expanded', String(!collapsed));
+  tocToggle.setAttribute('aria-label', collapsed ? 'Show table of contents' : 'Hide table of contents');
+  tocToggle.title = collapsed ? 'Show contents' : 'Hide contents';
 }
 
 function scrollToTocHeading(event: MouseEvent): void {
@@ -155,9 +189,12 @@ function buildTableOfContents(): void {
   tocHeadings = new Map(headings.map((heading) => [heading.id, heading]));
   const tocAvailable = headings.length > 0;
   tocSidebar.hidden = !tocAvailable;
+  tocToggle.hidden = !tocAvailable;
   tocResizer.hidden = !tocAvailable;
 
   if (!tocAvailable) return;
+
+  setTocCollapsed(tocCollapsed);
 
   const links = new Map<string, HTMLAnchorElement>();
   headings.forEach((heading) => {
@@ -282,7 +319,7 @@ function showDocument(doc: MarkdownDocument): void {
         return;
       }
       readerState.setAttribute('aria-busy', 'true');
-      const imageTask = loadLocalImages(doc, generation);
+      const imageTask = loadLocalImages(generation, doc.documentGrantId);
       const diagramTask = renderDiagrams(article, generation, () => generation === currentGeneration);
       void Promise.all([imageTask, diagramTask]).then(([imageFailures]) => {
         if (generation === currentGeneration) readerState.setAttribute('aria-busy', 'false');
@@ -301,38 +338,49 @@ function unavailableImage(img: HTMLImageElement): void {
   img.replaceWith(message);
 }
 
-async function loadLocalImages(doc: MarkdownDocument, generation: number): Promise<number> {
+async function loadLocalImages(generation: number, documentGrantId?: string): Promise<number> {
+  const maxConcurrentImages = 4;
   let failures = article.querySelectorAll('.image-unavailable').length;
   const images = Array.from(article.querySelectorAll<HTMLImageElement>('img.local-image[data-relative-path]'));
 
-  await Promise.all(images.map(async (img) => {
-    const relativePath = safeRelativeImagePath(img.dataset.relativePath ?? '');
-    if (!relativePath || !hasNativeBridge) {
-      if (generation === currentGeneration) unavailableImage(img);
-      failures += 1;
-      return;
-    }
-
-    try {
-      const dataUrl = await invoke<string>('read_local_image', { documentPath: doc.path, relativePath });
+  let nextImage = 0;
+  const worker = async (): Promise<void> => {
+    while (nextImage < images.length) {
+      const imageIndex = nextImage;
+      nextImage += 1;
       if (generation !== currentGeneration) return;
-      if (!/^data:image\/(?:png|jpeg|gif|webp|bmp);base64,/i.test(dataUrl)) {
-        throw new Error('The local image response was not a supported raster image.');
+
+      const img = images[imageIndex]!;
+      const relativePath = safeRelativeImagePath(img.dataset.relativePath ?? '');
+      if (!relativePath || !hasNativeBridge || !documentGrantId) {
+        if (generation === currentGeneration) unavailableImage(img);
+        failures += 1;
+        continue;
       }
-      await new Promise<void>((resolve, reject) => {
-        img.addEventListener('load', () => resolve(), { once: true });
-        img.addEventListener('error', () => reject(new Error('The local image could not be decoded.')), { once: true });
-        img.src = dataUrl;
-        if (img.complete) {
-          if (img.naturalWidth > 0) resolve();
-          else reject(new Error('The local image could not be decoded.'));
+
+      try {
+        const dataUrl = await invoke<string>('read_local_image', { documentGrantId, relativePath });
+        if (generation !== currentGeneration) return;
+        if (!/^data:image\/(?:png|jpeg|gif|webp|bmp);base64,/i.test(dataUrl)) {
+          throw new Error('The local image response was not a supported raster image.');
         }
-      });
-    } catch {
-      if (generation === currentGeneration) unavailableImage(img);
-      failures += 1;
+        await new Promise<void>((resolve, reject) => {
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => reject(new Error('The local image could not be decoded.')), { once: true });
+          img.src = dataUrl;
+          if (img.complete) {
+            if (img.naturalWidth > 0) resolve();
+            else reject(new Error('The local image could not be decoded.'));
+          }
+        });
+      } catch {
+        if (generation === currentGeneration) unavailableImage(img);
+        failures += 1;
+      }
     }
-  }));
+  };
+
+  await Promise.all(Array.from({ length: Math.min(maxConcurrentImages, images.length) }, () => worker()));
 
   return failures;
 }
@@ -346,22 +394,32 @@ function errorMessage(error: unknown): string {
   return String(error);
 }
 
-async function readNativeDocument(path: string, request: number): Promise<MarkdownDocument | undefined> {
-  const doc = await serializeDocumentReads(
-    () => request === openRequest,
-    () => invoke<MarkdownDocument>('read_document', { path }),
-  );
-  if (request !== openRequest) return undefined;
-  if (!doc || typeof doc.path !== 'string' || typeof doc.name !== 'string' || typeof doc.content !== 'string') {
+function validateNativeDocument(doc: MarkdownDocument | null | undefined): MarkdownDocument | undefined {
+  if (!doc) return undefined;
+  if (
+    typeof doc.name !== 'string'
+    || typeof doc.content !== 'string'
+    || typeof doc.documentGrantId !== 'string'
+    || doc.documentGrantId.length === 0
+  ) {
     throw new Error('The native reader returned an invalid document.');
   }
   return doc;
 }
 
-async function loadPath(path: string): Promise<void> {
+async function readNativeDocument(request: number): Promise<MarkdownDocument | undefined> {
+  const doc = await serializeDocumentReads(
+    () => request === openRequest,
+    () => invoke<MarkdownDocument | null>('read_document'),
+  );
+  if (request !== openRequest) return undefined;
+  return validateNativeDocument(doc);
+}
+
+async function loadPendingDocument(): Promise<void> {
   const request = ++openRequest;
   try {
-    const doc = await readNativeDocument(path, request);
+    const doc = await readNativeDocument(request);
     if (request !== openRequest || !doc) return;
     showDocument(doc);
   } catch (error) {
@@ -380,14 +438,15 @@ async function chooseFile(): Promise<void> {
     return;
   }
 
+  const request = ++openRequest;
   try {
-    const selected = await open({
-      title: 'Open a Markdown file',
-      multiple: false,
-      directory: false,
-      filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }],
-    });
-    if (typeof selected === 'string') await loadPath(selected);
+    const doc = await serializeDocumentReads(
+      () => request === openRequest,
+      () => invoke<MarkdownDocument | null>('open_document'),
+    );
+    if (request !== openRequest || !doc) return;
+    const validDocument = validateNativeDocument(doc);
+    if (validDocument) showDocument(validDocument);
   } catch (error) {
     setAlert(`Could not open the file picker. ${errorMessage(error)}`);
   }
@@ -403,7 +462,7 @@ browserOpenInput.addEventListener('change', () => {
   }
   void file.text().then((content) => {
     if (request !== openRequest) return;
-    showDocument({ path: file.name, name: file.name, content });
+    showDocument({ name: file.name, content });
   }).catch((error: unknown) => {
     if (request === openRequest) setAlert(`Could not read this file. ${errorMessage(error)}`);
   });
@@ -412,7 +471,6 @@ browserOpenInput.addEventListener('change', () => {
 function openSearch(): void {
   if (!currentDocument) return;
   searchPanel.hidden = false;
-  appShell.classList.add('search-open');
   searchInput.focus();
   searchInput.select();
 }
@@ -442,6 +500,7 @@ async function exportPdf(): Promise<void> {
     if (readiness.imageFailures > 0) {
       setStatus('Some local images could not be loaded. The printout will show placeholders; check that image paths are relative to the Markdown file.');
     }
+    flushSearch();
     const query = searchInput.value;
     clearArticleSearch(article);
     const printClosed = waitForPrintClose();
@@ -456,26 +515,28 @@ async function exportPdf(): Promise<void> {
   } finally {
     exportButton.disabled = !currentDocument;
     const currentLabel = exportButton.querySelector('span');
-    if (currentLabel) currentLabel.textContent = 'Export PDF';
+    if (currentLabel) currentLabel.textContent = 'PDF';
   }
 }
 
 openButton.addEventListener('click', () => { void chooseFile(); });
 emptyOpenButton.addEventListener('click', () => { void chooseFile(); });
 searchButton.addEventListener('click', openSearch);
-searchInput.addEventListener('input', runSearch);
+searchInput.addEventListener('input', scheduleSearch);
 searchInput.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     event.preventDefault();
     closeSearch(true);
   } else if (event.key === 'Enter') {
     event.preventDefault();
+    flushSearch();
     moveMatch(event.shiftKey ? -1 : 1);
   }
 });
 searchPrevious.addEventListener('click', () => moveMatch(-1));
 searchNext.addEventListener('click', () => moveMatch(1));
 searchClose.addEventListener('click', () => closeSearch(true));
+tocToggle.addEventListener('click', () => setTocCollapsed(!tocCollapsed));
 tocList.addEventListener('click', scrollToTocHeading);
 tocResizer.addEventListener('pointerdown', startTocResize);
 tocResizer.addEventListener('pointermove', moveTocResizer);
@@ -487,6 +548,7 @@ exportButton.addEventListener('click', () => { void exportPdf(); });
 window.addEventListener('resize', () => setTocWidth(tocWidth));
 
 setTocWidth(tocWidth);
+updateSearchCount();
 
 article.addEventListener('click', (event) => {
   const target = event.target;
@@ -530,35 +592,23 @@ async function initializeNativeEvents(): Promise<void> {
   if (!hasNativeBridge) return;
 
   try {
-    await listen<string[]>('open-files', ({ payload }) => {
+    await listen<number>('open-files', ({ payload }) => {
       appShell.classList.remove('is-dropping');
-      if (payload.length !== 1) {
+      if (payload !== 1) {
         setAlert('Open one Markdown file at a time.');
         return;
       }
-      void loadPath(payload[0]!);
+      void loadPendingDocument();
     });
-    const paths = await invoke<string[]>('take_pending_paths');
-    if (paths.length > 1) setAlert('Open one Markdown file at a time.');
-    else if (paths[0]) void loadPath(paths[0]);
+    void loadPendingDocument();
   } catch (error) {
     setAlert(`Could not receive the file that was opened. ${errorMessage(error)}`);
   }
 
   try {
-    await getCurrentWebview().onDragDropEvent(({ payload }) => {
-      if (payload.type === 'enter' || payload.type === 'over') {
-        appShell.classList.add('is-dropping');
-      } else if (payload.type === 'leave') {
-        appShell.classList.remove('is-dropping');
-      } else if (payload.type === 'drop') {
-        appShell.classList.remove('is-dropping');
-        if (payload.paths.length !== 1) {
-          setAlert('Drop one Markdown file at a time.');
-          return;
-        }
-        void loadPath(payload.paths[0]!);
-      }
+    await listen<string>('drag-state', ({ payload }) => {
+      if (payload === 'enter') appShell.classList.add('is-dropping');
+      else if (payload === 'leave') appShell.classList.remove('is-dropping');
     });
   } catch {
     // File drop is unavailable on this platform or webview version.

@@ -19,7 +19,9 @@ npm run tauri:build
 
 ## Read, search, and print
 
-The toolbar uses blue for Open File, purple for Search, a neutral Contents toggle, and red for Export PDF. When a document has headings, the left Table of contents sidebar opens by default; its real heading links smooth-scroll through the reading area and the Contents toggle collapses or expands it. The collapse state is kept only in the current session and is not persisted. Shortcuts are Ctrl+O / Cmd+O to open, Ctrl+F / Cmd+F to search, and Ctrl+P / Cmd+P to print.
+The compact toolbar uses neutral Open, Find, and PDF actions; the coral accent is reserved for focus, active navigation, selection, and the empty-state primary action. When a document has headings, the left Table of contents sidebar opens by default at about 272px wide, can be resized, and can be collapsed with its accessible arrow control so the article expands. Its real heading links smooth-scroll through the reading area, H1–H3 remain easy to scan, and deeper headings are visually quieter. The collapse state is kept only in the current session and is not persisted. Shortcuts are Ctrl+O / Cmd+O to open, Ctrl+F / Cmd+F to search, and Ctrl+P / Cmd+P to print.
+
+Prose uses a readable line length, while tables, code, XML/JSON, and diagrams can use the available article width and scroll horizontally when needed. Find is a compact upper-right utility: an empty query shows only the input, matches show the count and navigation buttons, and a non-empty query with no matches shows **No results**.
 
 Search covers visible Markdown text, including code blocks and tables. Diagram labels and the source inside diagram blocks are excluded. Search highlights are removed when the search closes and do not appear in print.
 
@@ -38,6 +40,8 @@ Phase 2 adds four offline extensions while retaining the Marked renderer:
 
 Relative PNG, JPEG, GIF, WebP, and BMP images are read from the Markdown file's folder and its subfolders. The native host rejects path traversal, symlink escapes, unsupported image types, and oversized files. Remote images are not loaded. HTTP and HTTPS links are shown as links and open in the system browser only after the reader selects them.
 
+Document paths stay inside the native host. In the desktop app, Open File asks the native file dialog to choose a document, while startup arguments, file-association launches, second-instance events, and desktop drops are queued and validated in Rust. The WebView can consume the resulting document and its opaque document grant, but it never submits an arbitrary native path to a read command. Local image requests carry only a relative path plus the current grant; a new document invalidates older grants before image resolution. Browser development mode keeps its separate browser-owned file input.
+
 Raw HTML is displayed as text. Dangerous URL schemes and script callbacks are disabled, Mermaid runs in strict mode, generated SVG is sanitized before display, and the KaTeX/highlight/admonition output is sanitized with the required MathML/SVG profiles but without SVG filter primitives or arbitrary data/ARIA attributes. Front matter uses js-yaml's `CORE_SCHEMA` with bounded depth and aliases disabled. This reader has no editor, telemetry, account, sync, background service, or automatic file writes.
 
 ## Library maintenance check
@@ -54,12 +58,13 @@ The pinned packages below were checked against npm registry metadata on Septembe
 | `marked-katex-extension` | `5.1.13` | 2026-09-16 | [marked-katex-extension](https://github.com/UziTech/marked-katex-extension) |
 | `js-yaml` | `5.4.2` | 2026-09-13 | [js-yaml](https://github.com/nodeca/js-yaml) |
 | `highlight.js` | `11.12.0` | 2026-08-12 | [highlight.js](https://github.com/highlightjs/highlight.js) |
+| `jsdom` (dev only) | `26.1.0` | 2025-04-13 | [jsdom](https://github.com/jsdom/jsdom) |
 | `@tauri-apps/api` | `2.12.0` | 2026-09-26 | [Tauri](https://github.com/tauri-apps/tauri) |
 | `@tauri-apps/cli` | `2.12.0` | 2026-09-26 | [Tauri](https://github.com/tauri-apps/tauri) |
 
-The selected PlantUML package is the official TeaVM-based `@plantuml/core`, not the discontinued CheerpJ-based `plantuml-core` integration or the older `plantuml.js` project. Its pinned release is MIT-licensed. Mermaid's current parser dependency graph includes nested `lodash-es` packages; the lockfile overrides those copies to `4.18.1` to address the high-severity advisories found by `npm audit` without forcing a Mermaid major-version change.
+The selected PlantUML package is the official TeaVM-based `@plantuml/core`, not the discontinued CheerpJ-based `plantuml-core` integration or the older `plantuml.js` project. Its pinned release is MIT-licensed. Mermaid's current parser dependency graph includes nested `lodash-es` packages; the lockfile overrides those copies to `4.18.1` to address the high-severity advisories found by `npm audit` without forcing a Mermaid major-version change. `lodash-es` is retained as a lockfile override only; it is not a direct application dependency.
 
-The Phase 2 dependency gate checked npm version history and deprecation metadata on September 27, 2026. `katex` (MIT), `marked-katex-extension` (MIT), and `js-yaml` (MIT) had releases on September 23, 16, and 13; `highlight.js` (BSD-3-Clause) released on August 12. None had a deprecation notice, and `npm audit --omit=dev` reported no vulnerabilities at verification time. KaTeX's peer ranges accept the pinned Marked and KaTeX versions. The frontend bundle imports KaTeX's CSS from a checked-in filtered copy so only the 20 required `.woff2` font payloads are shipped (19 emitted files and one small Vite-inlined font); legacy `.woff` and `.ttf` files are not shipped.
+The Phase 2 dependency gate checked npm version history and deprecation metadata on September 27, 2026. `katex` (MIT), `marked-katex-extension` (MIT), and `js-yaml` (MIT) had releases on September 23, 16, and 13; `highlight.js` (BSD-3-Clause) released on August 12. `jsdom@26.1.0` (MIT, Node `>=18`) was released on April 13, 2025 and is used only by the real DOMPurify regression tests. None of these direct packages had a deprecation notice. npm reports a deprecation notice for the dev-only transitive `whatwg-encoding@3.1.1`; it is not part of the shipped production graph. `npm audit --omit=dev` reported no vulnerabilities at verification time. KaTeX's peer ranges accept the pinned Marked and KaTeX versions. The frontend bundle imports KaTeX's CSS from a checked-in filtered copy so only the 20 required `.woff2` font payloads are shipped (19 emitted files and one small Vite-inlined font); legacy `.woff` and `.ttf` files are not shipped.
 
 ## Example fixture
 

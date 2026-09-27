@@ -1,6 +1,6 @@
 [package]
 name = "markdown-preview-plus"
-version = "1.0.0"
+version = "1.0.1"
 description = "A read-only Markdown desktop reader"
 authors = ["Markdown Preview Plus contributors"]
 edition = "2021"

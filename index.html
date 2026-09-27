@@ -11,32 +11,22 @@
     <div class="app-shell">
       <header class="toolbar" aria-label="Document toolbar">
         <div class="document-identity">
-          <span class="document-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none">
-              <rect x="1.625" y="1.625" width="28.75" height="28.75" rx="6.375" fill="#FFFFFF" />
-              <text x="5.95" y="20" fill="#292D32" font-family="Segoe UI, Arial, sans-serif" font-size="13.25" font-weight="700">M</text>
-              <path d="M18.75 21.3125H22.875V25.5" stroke="#FF5A5F" stroke-width="1.4375" stroke-linecap="round" stroke-linejoin="round" />
-              <circle cx="18.75" cy="21.3125" r="1.5" fill="#FF5A5F" />
-              <circle cx="22.875" cy="21.3125" r="1.5" fill="#FF5A5F" />
-              <circle cx="22.875" cy="25.5" r="1.5" fill="#FF5A5F" />
-            </svg>
-          </span>
           <span class="document-labels">
             <strong id="document-name">Markdown Preview Plus</strong>
           </span>
         </div>
         <nav class="toolbar-actions" aria-label="Document actions">
-          <button class="toolbar-button toolbar-button-open" id="open-button" type="button" aria-label="Open a Markdown file">
+          <button class="toolbar-button toolbar-button-open" id="open-button" type="button" aria-label="Open a Markdown file" title="Open Markdown file (Ctrl+O)">
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3.75 7.75A1.75 1.75 0 0 1 5.5 6h4l1.7 1.8h7.3A1.75 1.75 0 0 1 20.25 9.5v8A1.75 1.75 0 0 1 18.5 19.25h-13A1.75 1.75 0 0 1 3.75 17.5v-9.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.75 10h16.5" stroke="currentColor" stroke-width="1.5"/></svg>
-            <span>Open File</span>
+            <span>Open</span>
           </button>
-          <button class="toolbar-button toolbar-button-search" id="search-button" type="button" aria-label="Search in this file" disabled>
+          <button class="toolbar-button toolbar-button-search" id="search-button" type="button" aria-label="Find in this file" title="Find in file (Ctrl+F)" disabled>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" stroke-width="1.6"/><path d="m15.4 15.4 4.1 4.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-            <span>Search</span>
+            <span>Find</span>
           </button>
-          <button class="toolbar-button toolbar-button-export" id="export-button" type="button" aria-label="Export this file to PDF" disabled>
+          <button class="toolbar-button toolbar-button-export" id="export-button" type="button" aria-label="Export this file to PDF" title="Export to PDF (Ctrl+P)" disabled>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 3.75h7l4 4v12.5H7A1.75 1.75 0 0 1 5.25 18.5V5.5A1.75 1.75 0 0 1 7 3.75Z" stroke="currentColor" stroke-width="1.5"/><path d="M14 4v4h4M8.5 13h7M8.5 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <span>Export PDF</span>
+            <span>PDF</span>
           </button>
         </nav>
       </header>
@@ -47,13 +37,13 @@
         </span>
         <label class="visually-hidden" for="search-input">Find in file</label>
         <input id="search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Find in file" aria-label="Find in file" />
-        <output id="search-count" class="search-count" aria-live="polite">0 of 0</output>
-        <span class="search-divider" aria-hidden="true"></span>
+        <output id="search-count" class="search-count" aria-live="polite" hidden></output>
+        <span class="search-divider" id="search-divider" aria-hidden="true" hidden></span>
         <div class="search-controls">
-          <button class="icon-button" id="search-previous" type="button" aria-label="Previous match" title="Previous match (Shift+Enter)">
+          <button class="icon-button" id="search-previous" type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6 14 6-6 6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button class="icon-button" id="search-next" type="button" aria-label="Next match" title="Next match (Enter)">
+          <button class="icon-button" id="search-next" type="button" aria-label="Next match" title="Next match (Enter)" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6 10 6 6 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <button class="icon-button" id="search-close" type="button" aria-label="Close search" title="Close search (Escape)">
@@ -69,6 +59,10 @@
             <ol class="toc-list" id="toc-list"></ol>
           </nav>
         </aside>
+        <button class="toc-toggle" id="toc-toggle" type="button" aria-controls="toc-sidebar" aria-expanded="true" aria-label="Hide table of contents" title="Hide contents" hidden>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m14.5 6.5-5 5.5 5 5.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="visually-hidden">Contents</span>
+        </button>
         <div
           class="toc-resizer"
           id="toc-resizer"
@@ -76,10 +70,10 @@
           aria-label="Resize table of contents"
           aria-controls="toc-sidebar"
           aria-orientation="vertical"
-          aria-valuemin="190"
+          aria-valuemin="220"
           aria-valuemax="420"
-          aria-valuenow="220"
-          aria-valuetext="220 pixels"
+          aria-valuenow="272"
+          aria-valuetext="272 pixels"
           tabindex="0"
           hidden
         ></div>

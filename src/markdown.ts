@@ -380,10 +380,14 @@ export function renderMarkdownDocument(source: string): MarkdownRenderResult {
     ? `<div class="front-matter-error" role="status">${escapeHtml(frontMatter.error)}</div>\n`
     : '';
   return {
-    html: DOMPurify.sanitize(error + rendered, purifierOptions),
+    html: sanitizeRenderedHtml(error + rendered),
     metadata: frontMatter.metadata,
     frontMatterError: frontMatter.error,
   };
+}
+
+export function sanitizeRenderedHtml(html: string): string {
+  return DOMPurify.sanitize(html, purifierOptions);
 }
 
 export function renderMarkdown(source: string): string {

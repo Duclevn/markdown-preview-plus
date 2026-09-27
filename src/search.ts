@@ -14,6 +14,60 @@ function isSearchableText(node: Node): boolean {
   return Boolean(node.textContent);
 }
 
+interface SearchRange {
+  start: number;
+  end: number;
+}
+
+interface LowercaseTextMap {
+  text: string;
+  sourceStarts: number[];
+  sourceEnds: number[];
+}
+
+type LowercaseLocales = string | string[] | undefined;
+const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+function lowercaseWithSourceMap(text: string, locales?: LowercaseLocales): LowercaseTextMap {
+  const lowercaseText = text.toLocaleLowerCase(locales);
+  const sourceStarts: number[] = [];
+  const sourceEnds: number[] = [];
+
+  for (const { index: sourceStart, segment } of graphemeSegmenter.segment(text)) {
+    const sourceEnd = sourceStart + segment.length;
+    const lowercaseSegment = segment.toLocaleLowerCase(locales);
+    for (let offset = 0; offset < lowercaseSegment.length; offset += 1) {
+      sourceStarts.push(sourceStart);
+      sourceEnds.push(sourceEnd);
+    }
+  }
+
+  return { text: lowercaseText, sourceStarts, sourceEnds };
+}
+
+function findSearchRangesWithNeedle(text: string, needle: string, locales?: LowercaseLocales): SearchRange[] {
+  if (!needle) return [];
+
+  const lowercase = lowercaseWithSourceMap(text, locales);
+  const ranges: SearchRange[] = [];
+  let cursor = 0;
+  let index = lowercase.text.indexOf(needle, cursor);
+  while (index !== -1) {
+    const matchEnd = index + needle.length - 1;
+    const start = lowercase.sourceStarts[index];
+    const end = lowercase.sourceEnds[matchEnd];
+    if (start === undefined || end === undefined) break;
+    ranges.push({ start, end });
+    cursor = index + needle.length;
+    index = lowercase.text.indexOf(needle, cursor);
+  }
+  return ranges;
+}
+
+export function findSearchRanges(text: string, query: string, locales?: LowercaseLocales): SearchRange[] {
+  return findSearchRangesWithNeedle(text, query.trim().toLocaleLowerCase(locales), locales);
+}
+
 export function searchArticle(article: HTMLElement, query: string): HTMLElement[] {
   clearArticleSearch(article);
   const needle = query.trim().toLocaleLowerCase();
@@ -32,19 +86,16 @@ export function searchArticle(article: HTMLElement, query: string): HTMLElement[
   const matches: HTMLElement[] = [];
   for (const node of textNodes) {
     const text = node.data;
-    const lower = text.toLocaleLowerCase();
     const fragment = document.createDocumentFragment();
     let cursor = 0;
-    let index = lower.indexOf(needle, cursor);
-    while (index !== -1) {
-      fragment.append(document.createTextNode(text.slice(cursor, index)));
+    for (const { start, end } of findSearchRangesWithNeedle(text, needle)) {
+      fragment.append(document.createTextNode(text.slice(cursor, start)));
       const mark = document.createElement('mark');
       mark.className = 'search-hit';
-      mark.textContent = text.slice(index, index + needle.length);
+      mark.textContent = text.slice(start, end);
       fragment.append(mark);
       matches.push(mark);
-      cursor = index + needle.length;
-      index = lower.indexOf(needle, cursor);
+      cursor = end;
     }
     fragment.append(document.createTextNode(text.slice(cursor)));
     node.replaceWith(fragment);
