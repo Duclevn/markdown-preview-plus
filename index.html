@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; frame-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:1420" />
+    <title>Markdown Preview Plus</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="toolbar" aria-label="Document toolbar">
+        <div class="document-identity">
+          <span class="document-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none">
+              <rect x="1.625" y="1.625" width="28.75" height="28.75" rx="6.375" fill="#FFFFFF" />
+              <text x="5.95" y="20" fill="#292D32" font-family="Segoe UI, Arial, sans-serif" font-size="13.25" font-weight="700">M</text>
+              <path d="M18.75 21.3125H22.875V25.5" stroke="#FF5A5F" stroke-width="1.4375" stroke-linecap="round" stroke-linejoin="round" />
+              <circle cx="18.75" cy="21.3125" r="1.5" fill="#FF5A5F" />
+              <circle cx="22.875" cy="21.3125" r="1.5" fill="#FF5A5F" />
+              <circle cx="22.875" cy="25.5" r="1.5" fill="#FF5A5F" />
+            </svg>
+          </span>
+          <span class="document-labels">
+            <strong id="document-name">Markdown Preview Plus</strong>
+          </span>
+        </div>
+        <nav class="toolbar-actions" aria-label="Document actions">
+          <button class="toolbar-button toolbar-button-open" id="open-button" type="button" aria-label="Open a Markdown file">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3.75 7.75A1.75 1.75 0 0 1 5.5 6h4l1.7 1.8h7.3A1.75 1.75 0 0 1 20.25 9.5v8A1.75 1.75 0 0 1 18.5 19.25h-13A1.75 1.75 0 0 1 3.75 17.5v-9.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.75 10h16.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            <span>Open File</span>
+          </button>
+          <button class="toolbar-button toolbar-button-search" id="search-button" type="button" aria-label="Search in this file" disabled>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" stroke-width="1.6"/><path d="m15.4 15.4 4.1 4.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            <span>Search</span>
+          </button>
+          <button class="toolbar-button toolbar-button-export" id="export-button" type="button" aria-label="Export this file to PDF" disabled>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M7 3.75h7l4 4v12.5H7A1.75 1.75 0 0 1 5.25 18.5V5.5A1.75 1.75 0 0 1 7 3.75Z" stroke="currentColor" stroke-width="1.5"/><path d="M14 4v4h4M8.5 13h7M8.5 16h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>Export PDF</span>
+          </button>
+        </nav>
+      </header>
+
+      <section class="search-panel" id="search-panel" aria-label="Search in document" hidden>
+        <span class="search-leading-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="10.8" cy="10.8" r="6.3" stroke="currentColor" stroke-width="1.6"/><path d="m15.4 15.4 4.1 4.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+        <label class="visually-hidden" for="search-input">Find in file</label>
+        <input id="search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Find in file" aria-label="Find in file" />
+        <output id="search-count" class="search-count" aria-live="polite">0 of 0</output>
+        <span class="search-divider" aria-hidden="true"></span>
+        <div class="search-controls">
+          <button class="icon-button" id="search-previous" type="button" aria-label="Previous match" title="Previous match (Shift+Enter)">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6 14 6-6 6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="icon-button" id="search-next" type="button" aria-label="Next match" title="Next match (Enter)">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6 10 6 6 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="icon-button" id="search-close" type="button" aria-label="Close search" title="Close search (Escape)">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m7 7 10 10M17 7 7 17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <div class="reader-layout" id="reader-layout">
+        <aside class="toc-sidebar" id="toc-sidebar" hidden>
+          <nav class="toc-nav" aria-label="Table of contents">
+            <h2 class="toc-title">Contents</h2>
+            <ol class="toc-list" id="toc-list"></ol>
+          </nav>
+        </aside>
+        <div
+          class="toc-resizer"
+          id="toc-resizer"
+          role="separator"
+          aria-label="Resize table of contents"
+          aria-controls="toc-sidebar"
+          aria-orientation="vertical"
+          aria-valuemin="190"
+          aria-valuemax="420"
+          aria-valuenow="220"
+          aria-valuetext="220 pixels"
+          tabindex="0"
+          hidden
+        ></div>
+
+        <main class="reading-area" id="reading-area">
+          <p class="reader-alert" id="reader-alert" role="alert" hidden></p>
+          <section class="empty-state" id="empty-state" aria-labelledby="empty-title">
+            <div class="empty-illustration" aria-hidden="true">
+              <svg viewBox="0 0 72 72" fill="none">
+                <path d="M17 9.5h25l14 14v38H17a6 6 0 0 1-6-6v-40a6 6 0 0 1 6-6Z" fill="var(--paper)" stroke="var(--line-strong)" stroke-width="1.5" />
+                <path d="M42 10v14h14M23 35h27M23 42h27M23 49h19" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="54" cy="54" r="11" fill="var(--accent-soft)" stroke="var(--paper)" stroke-width="3" />
+                <path d="m50.5 54 2.4 2.4 4.7-5" stroke="var(--accent-strong)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <h1 id="empty-title">Your Markdown, beautifully readable.</h1>
+            <p>Open a file to settle in with your notes, plans, and ideas.</p>
+            <button class="empty-open-button" id="empty-open-button" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3.75 7.75A1.75 1.75 0 0 1 5.5 6h4l1.7 1.8h7.3A1.75 1.75 0 0 1 20.25 9.5v8A1.75 1.75 0 0 1 18.5 19.25h-13A1.75 1.75 0 0 1 3.75 17.5v-9.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.75 10h16.5" stroke="currentColor" stroke-width="1.5"/></svg>
+              <span>Open a Markdown file</span>
+            </button>
+            <p class="drop-hint"><strong>Or drop a .md file here</strong><span id="shortcut-hint">Ctrl+O</span></p>
+          </section>
+
+          <section class="reader-state" id="reader-state" hidden aria-busy="false">
+            <div class="empty-document" id="empty-document" hidden>
+              <h1>This document is empty</h1>
+              <p>There’s nothing to read in this file yet.</p>
+            </div>
+            <article class="article" id="article" tabindex="-1"></article>
+          </section>
+        </main>
+      </div>
+
+      <p class="live-status" id="live-status" role="status" aria-live="polite" hidden></p>
+      <input id="browser-open-input" class="browser-open-input" type="file" accept=".md,.markdown" tabindex="-1" aria-hidden="true" />
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

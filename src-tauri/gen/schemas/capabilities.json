@@ -1,0 +1,1 @@
+{"main-window":{"identifier":"main-window","description":"Allows the main reader window to open files and handle app events.","local":true,"windows":["main"],"permissions":["core:event:default","dialog:allow-open","opener:allow-default-urls","opener:allow-open-url"]}}

@@ -1,0 +1,21 @@
+[package]
+name = "markdown-preview-plus"
+version = "1.0.0"
+description = "A read-only Markdown desktop reader"
+authors = ["Markdown Preview Plus contributors"]
+edition = "2021"
+
+[lib]
+name = "markdown_preview_plus_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.0", features = [] }
+
+[dependencies]
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+tauri = { version = "=2.12.0", features = [] }
+tauri-plugin-dialog = "=2.7.3"
+tauri-plugin-opener = "=2.5.5"
+tauri-plugin-single-instance = "=2.4.5"

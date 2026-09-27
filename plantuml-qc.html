@@ -1,0 +1,37 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PlantUML QC</title>
+<link rel="stylesheet" href="/src/styles.css">
+<main id="article">
+  <h1>PlantUML QC</h1>
+  <pre class="diagram-placeholder" data-language="mermaid"><code>flowchart LR
+    A --> B</code></pre>
+  <pre class="diagram-placeholder" data-language="plantuml"><code>@startuml
+actor Reader
+participant App
+Reader -&gt; App : Open file
+App --&gt; Reader : Show search-token
+@enduml</code></pre>
+  <pre class="diagram-placeholder" data-language="plantuml"><code>@startuml
+class Reader {
+  +open()
+  +search()
+  +print()
+}
+class Document {
+  +name: String
+  +content: String
+}
+Reader --&gt; Document : reads
+@enduml</code></pre>
+  <pre class="diagram-placeholder" data-language="plantuml"><code>@startuml
+Alice -&gt;
+class
+@enduml</code></pre>
+  <p id="after">Trailing content survives.</p>
+</main>
+<script type="module">
+  import { renderDiagrams } from '/src/diagrams.ts';
+  await renderDiagrams(document.querySelector('#article'), 1, () => true);
+  document.body.dataset.qcDone = 'true';
+</script>
