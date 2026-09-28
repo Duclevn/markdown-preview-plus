@@ -68,6 +68,12 @@ export function findSearchRanges(text: string, query: string, locales?: Lowercas
   return findSearchRangesWithNeedle(text, query.trim().toLocaleLowerCase(locales), locales);
 }
 
+export function nextSearchMatchIndex(matchCount: number, current: number, direction: 1 | -1): number {
+  if (matchCount <= 0) return -1;
+  if (current < 0) return direction === -1 ? matchCount - 1 : 0;
+  return (current + direction + matchCount) % matchCount;
+}
+
 export function searchArticle(article: HTMLElement, query: string): HTMLElement[] {
   clearArticleSearch(article);
   const needle = query.trim().toLocaleLowerCase();
@@ -105,13 +111,12 @@ export function searchArticle(article: HTMLElement, query: string): HTMLElement[
 
 export function moveSearchMatch(matches: HTMLElement[], current: number, direction: 1 | -1): number {
   if (matches.length === 0) return -1;
-  const next = current < 0 ? 0 : (current + direction + matches.length) % matches.length;
+  const next = nextSearchMatchIndex(matches.length, current, direction);
   for (const match of matches) {
     match.classList.remove('search-hit-current');
     match.removeAttribute('aria-current');
   }
   matches[next]?.classList.add('search-hit-current');
   matches[next]?.setAttribute('aria-current', 'true');
-  matches[next]?.scrollIntoView({ block: 'nearest' });
   return next;
 }

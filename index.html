@@ -37,13 +37,16 @@
         </span>
         <label class="visually-hidden" for="search-input">Find in file</label>
         <input id="search-input" type="search" autocomplete="off" spellcheck="false" placeholder="Find in file" aria-label="Find in file" />
+        <button class="icon-button search-clear" id="search-clear" type="button" aria-label="Clear search query" title="Clear search query" hidden>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m8 8 8 8M16 8 8 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
         <output id="search-count" class="search-count" aria-live="polite" hidden></output>
         <span class="search-divider" id="search-divider" aria-hidden="true" hidden></span>
         <div class="search-controls">
-          <button class="icon-button" id="search-previous" type="button" aria-label="Previous match" title="Previous match (Shift+Enter)" hidden>
+          <button class="icon-button" id="search-previous" type="button" aria-label="Previous match" title="Previous match (Shift+Enter or Shift+F3)" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6 14 6-6 6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button class="icon-button" id="search-next" type="button" aria-label="Next match" title="Next match (Enter)" hidden>
+          <button class="icon-button" id="search-next" type="button" aria-label="Next match" title="Next match (Enter or F3)" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="m6 10 6 6 6-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
           <button class="icon-button" id="search-close" type="button" aria-label="Close search" title="Close search (Escape)">

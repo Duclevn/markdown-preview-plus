@@ -2,6 +2,31 @@
 
 This verification records the repository-audit remediation, the complete 15-item UI feedback pass, and the Windows `1.0.1` release artifact checks. The evidence below records commands run against the working tree after the changes. The installer was built and published with the release; silent installation and a no-document cold start were verified afterward, while uninstallation and full native interaction remain unverified.
 
+## Search UX follow-up — 2026-09-28
+
+- Search navigation now keeps the active match below the floating panel, places an off-screen match around 30% down the reading viewport, and switches to instant scrolling during rapid repeated navigation.
+- Search supports F3 / Shift+F3, a separate subtle clear-query button, the `current / total` counter format, and a calm warning-colored **No results** state. Existing Enter/Shift+Enter and Escape behavior remains unchanged.
+- `npm run check` — passed.
+- `npm test` — passed: 3 test files and 22 tests, including rich visible-text search coverage with diagram/hidden-content exclusions.
+- `npm run build` — passed; Vite emitted only the existing large-chunk warnings.
+- `npm audit --omit=dev` — passed with 0 reported vulnerabilities.
+- Windows NSIS build via `.tools\\build-windows.cmd` — passed; installer `src-tauri/target/release/bundle/nsis/Markdown Preview Plus_1.0.1_x64-setup.exe` is 5,872,889 bytes / 5.60 MiB. SHA-256: `E1B5B95840D29010C2975BFE5EADFE659945CCD041D9385D4C4C41D14EEF2C71`.
+- Release executable is 13,321,216 bytes. SHA-256: `6A8950987B1B733BD7CF062C8D4F19ABDBAE27B7E0A876F0E0096EA486AE8617`.
+- `git diff --check` — passed; Git reported only its existing CRLF normalization warnings.
+- Manual light/dark fixture smoke, installer launch/uninstall, and Linux/macOS builds/runtime checks were not run in this follow-up.
+
+## Branding and search-highlight follow-up — 2026-09-28
+
+- Replaced the indigo accent family with neutral charcoal/gray values for branding, focus, active navigation, and TOC states; the active search match now uses a darker gold fill with contrasting text and no red outline.
+- `npm run check` — passed.
+- `npm test` — passed: 3 test files and 22 tests.
+- `npm run build` — passed; Vite emitted only the existing large-chunk warnings for bundled diagram runtimes.
+- `npm audit --omit=dev` — passed with 0 reported vulnerabilities.
+- `.tools\\build-windows.cmd` — passed; NSIS installer `src-tauri/target/release/bundle/nsis/Markdown Preview Plus_1.0.1_x64-setup.exe` is 5,873,893 bytes / 5.60 MiB. SHA-256: `FE4DD31C0DE7D9D0C206269ED42A48E3E18AE2B62D58422783E55B3EF7D784EC`.
+- Release executable `src-tauri/target/release/markdown-preview-plus.exe` is 13,321,216 bytes. SHA-256: `D74E6DC7DBE41F850644A3F204E9D13BF11C722B7880BCB4C7F03CDCC199F53D`.
+- Frontend `dist/` output is 13,184,777 bytes. `git diff --check` passed; Git reported only existing CRLF normalization warnings.
+- Manual light/dark fixture smoke, installer launch/uninstall, and Linux/macOS builds/runtime checks were not run.
+
 ## 1.0.1 UI and Windows release validation
 
 - All 15 items in `markdown-preview-plus-ui-review-v2.md` were implemented, including compact neutral toolbar/search, explicit search states, resizable/collapsible TOC hierarchy, quieter scrolling, adaptive prose-versus-technical widths, tighter typography, and semantic color usage.

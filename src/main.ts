@@ -32,6 +32,7 @@ const searchButton = element<HTMLButtonElement>('search-button');
 const exportButton = element<HTMLButtonElement>('export-button');
 const searchPanel = element<HTMLElement>('search-panel');
 const searchInput = element<HTMLInputElement>('search-input');
+const searchClear = element<HTMLButtonElement>('search-clear');
 const searchCount = element<HTMLOutputElement>('search-count');
 const searchDivider = element<HTMLSpanElement>('search-divider');
 const searchPrevious = element<HTMLButtonElement>('search-previous');
@@ -66,6 +67,7 @@ let openRequest = 0;
 let searchMatches: HTMLElement[] = [];
 let currentMatch = -1;
 let searchTimer = 0;
+let lastSearchNavigationAt = 0;
 let currentReadiness: Promise<Readiness> = Promise.resolve({ imageFailures: 0 });
 let statusTimer = 0;
 let tocObserver: IntersectionObserver | undefined;
@@ -95,9 +97,12 @@ function setAlert(message: string): void {
 function updateSearchCount(): void {
   const hasQuery = searchInput.value.trim().length > 0;
   const hasMatches = searchMatches.length > 0;
+  const noResults = hasQuery && !hasMatches;
+  searchClear.hidden = !hasQuery;
   searchCount.hidden = !hasQuery;
+  searchCount.classList.toggle('is-empty', noResults);
   searchCount.textContent = hasMatches
-    ? `${currentMatch < 0 ? 0 : currentMatch + 1} of ${searchMatches.length}`
+    ? `${currentMatch < 0 ? 0 : currentMatch + 1} / ${searchMatches.length}`
     : hasQuery ? 'No results' : '';
   searchDivider.hidden = !hasMatches;
   searchPrevious.hidden = !hasMatches;
@@ -106,11 +111,43 @@ function updateSearchCount(): void {
   searchNext.disabled = !hasMatches;
 }
 
+function scrollToSearchMatch(match: HTMLElement): void {
+  if (searchPanel.hidden) return;
+
+  const viewport = readingArea.getBoundingClientRect();
+  const panelBottom = searchPanel.getBoundingClientRect().bottom;
+  const safeTop = Math.max(viewport.top + 16, panelBottom + 20);
+  const safeBottom = viewport.bottom - 20;
+  if (safeTop >= safeBottom) return;
+
+  const matchRect = match.getBoundingClientRect();
+  if (matchRect.top >= safeTop && matchRect.bottom <= safeBottom) return;
+
+  const targetCenter = Math.min(
+    Math.max(viewport.top + viewport.height * 0.3, safeTop + matchRect.height / 2),
+    safeBottom - matchRect.height / 2,
+  );
+  const matchCenter = (matchRect.top + matchRect.bottom) / 2;
+  const now = performance.now();
+  const isRapidNavigation = now - lastSearchNavigationAt < 220;
+  lastSearchNavigationAt = now;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const scrollDelta = matchCenter - targetCenter;
+  if (reduceMotion || isRapidNavigation) {
+    readingArea.scrollTop += scrollDelta;
+  } else {
+    readingArea.scrollBy({ top: scrollDelta, behavior: 'smooth' });
+  }
+}
+
 function runSearch(): void {
   searchTimer = 0;
   searchMatches = searchArticle(article, searchInput.value);
   currentMatch = searchMatches.length > 0 ? moveSearchMatch(searchMatches, -1, 1) : -1;
   updateSearchCount();
+  const initialMatch = currentMatch >= 0 ? searchMatches[currentMatch] : undefined;
+  if (initialMatch) scrollToSearchMatch(initialMatch);
 }
 
 function scheduleSearch(): void {
@@ -141,6 +178,16 @@ function moveMatch(direction: 1 | -1): void {
   flushSearch();
   currentMatch = moveSearchMatch(searchMatches, currentMatch, direction);
   updateSearchCount();
+  const nextMatch = currentMatch >= 0 ? searchMatches[currentMatch] : undefined;
+  if (nextMatch) scrollToSearchMatch(nextMatch);
+}
+
+function clearSearchQuery(): void {
+  window.clearTimeout(searchTimer);
+  searchTimer = 0;
+  searchInput.value = '';
+  runSearch();
+  searchInput.focus();
 }
 
 function disconnectTocObserver(): void {
@@ -535,6 +582,7 @@ searchInput.addEventListener('keydown', (event) => {
 });
 searchPrevious.addEventListener('click', () => moveMatch(-1));
 searchNext.addEventListener('click', () => moveMatch(1));
+searchClear.addEventListener('click', clearSearchQuery);
 searchClose.addEventListener('click', () => closeSearch(true));
 tocToggle.addEventListener('click', () => setTocCollapsed(!tocCollapsed));
 tocList.addEventListener('click', scrollToTocHeading);
@@ -566,6 +614,11 @@ article.addEventListener('click', (event) => {
 });
 
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'F3' && !event.metaKey && !event.ctrlKey && !event.altKey && !searchPanel.hidden) {
+    event.preventDefault();
+    moveMatch(event.shiftKey ? -1 : 1);
+    return;
+  }
   if (event.key === 'Escape' && !searchPanel.hidden) {
     event.preventDefault();
     closeSearch(true);
